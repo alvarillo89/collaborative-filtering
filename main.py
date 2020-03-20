@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import random
+import argparse
 import pandas as pd
 from collfilter import CollaborativeFilter
 
@@ -35,6 +36,7 @@ def get_user_ratings(films, user_id, n_films, rand=False):
         be different from the others present in your data
     rand -- If True, active user rates will be generated randomly 
     """
+    random.seed(89)
     n = films.shape[0]
     df = pd.DataFrame(columns=("user_id", "item_id", "rating"))
     for _ in range(n_films):
@@ -61,9 +63,24 @@ def get_user_ratings(films, user_id, n_films, rand=False):
 
 
 if __name__ == "__main__":
+
+    parse = argparse.ArgumentParser(description="Sample script for CollaborativeFiltering")
+
+    parse.add_argument('-k', type=int, default=10, help="Neighborhood size. Default 10")
+    parse.add_argument('-n', type=int, default=20, help="Items to rate. Default 20")
+    parse.add_argument('--rand', action="store_true", help="Generate random ratings")
+    parse.add_argument('--mi', type=int, default=10, help="Items to show in recommendation. Default 10")
+
+    args = vars(parse.parse_args())
+
     # Load data:
-    random.seed(89)
     user, items = load_files(ratings='./ml-data/u.data', items='./ml-data/u.item')
+    # Create collaborative filter object:
     cf = CollaborativeFilter(user_ratings=user, items_info=items)
-    active_user_ratings = get_user_ratings(films=items, user_id=944, n_films=20, rand=True)
-    neighbor = cf.build_neighborhood(active_user_ratings=active_user_ratings, k=10)
+    # Get 20 random movies ratings:
+    active_user_ratings = get_user_ratings(films=items, user_id=944, n_films=args['n'], rand=args['rand'])
+    # Build a neighborhood with size 10:
+    neighbor = cf.build_neighborhood(act_user=active_user_ratings, k=args['k'])
+    # Compute recommendations and show the title of the movies:
+    recomm = cf.recommend(neighborhood=neighbor, act_user=active_user_ratings, min_rating=4, max_items=args['mi'])
+    cf.show(recommendations=recomm)
