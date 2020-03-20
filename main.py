@@ -77,9 +77,9 @@ if __name__ == "__main__":
     user, items = load_files(ratings='./ml-data/u.data', items='./ml-data/u.item')
     # Create collaborative filter object:
     cf = CollaborativeFilter(user_ratings=user, items_info=items)
-    # Get 20 random movies ratings:
+    # Get random movies ratings:
     active_user_ratings = get_user_ratings(films=items, user_id=944, n_films=args['n'], rand=args['rand'])
-    # Build a neighborhood with size 10:
+    # Build the neighborhood:
     neighbor = cf.build_neighborhood(act_user=active_user_ratings, k=args['k'])
     # Compute recommendations and show the title of the movies:
     recomm = cf.recommend(neighborhood=neighbor, act_user=active_user_ratings, min_rating=4, max_items=args['mi'])
