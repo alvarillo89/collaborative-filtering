@@ -88,8 +88,7 @@ class CollaborativeFilter:
         act_user -- Pandas dataframe that contains the active user ratings.
         min_rating -- Items with a predicted rating lower than this parameter 
             will be discarded from the final result.
-        max_items -- Maximum number of items to recommend. None to return all 
-            recommended items.
+        max_items -- Maximum number of items to recommend.
         """
         if not (isinstance(neighborhood, pd.DataFrame) and isinstance(act_user, pd.DataFrame)):
             raise AttributeError("neighborhood and act_user must be a Pandas DataFrames")
