@@ -27,13 +27,16 @@ class CollaborativeFilter:
     
 
     def __build_item_user_table(self, active):
+        """ Build the item-user table (invested for efficiency) and
+        computes the mean rating of users.
+        """
         # Add active user ratings to the existing ratings:
         users = self.users.append(active, ignore_index=True)
-        # Build the item-user table (invested for efficiency):
+        mean = pd.DataFrame({'mean':users.groupby('user_id')['rating'].mean()})
         table = pd.pivot_table(users, values='rating', index="item_id", 
             columns="user_id", fill_value=0)
 
-        return table
+        return table, mean
         
 
     def build_neighborhood(self, act_user, k):
@@ -49,7 +52,7 @@ class CollaborativeFilter:
         df = pd.DataFrame(columns=['user_id', 'Correlation'])        
         # Get active user id:
         active_id = act_user.iloc[0]['user_id']
-        table = self.__build_item_user_table(act_user)
+        table, _ = self.__build_item_user_table(act_user)
         
         # Compute correlations:
         for user in table:
@@ -69,15 +72,18 @@ class CollaborativeFilter:
         return df
     
 
-    def __predict(self, weights, ratings):
+    def __predict(self, weights, ratings, means, act_mean):
         """ Predicts expected rating for an item not seen by active user, 
         based on correlation and neighborhood ratings
         """
         wnp = np.array(weights)
         rnp = np.array(ratings)
-        num = (wnp * rnp).sum()
-        den = np.abs(wnp * np.where(rnp!=0, 1., 0.)).sum()  
-        return num / den
+        mnp = np.array(means)
+        mask = np.where(rnp!=0, 1., 0.)
+        mnp *= mask
+        num = (wnp * (rnp - mnp)).sum()
+        den = np.abs(wnp * mask).sum()  
+        return (num / den) + act_mean
 
 
     def recommend(self, neighborhood, act_user, min_rating, max_items):
@@ -93,13 +99,15 @@ class CollaborativeFilter:
         if not (isinstance(neighborhood, pd.DataFrame) and isinstance(act_user, pd.DataFrame)):
             raise AttributeError("neighborhood and act_user must be a Pandas DataFrames")
 
-        # Build table:
+        # Build table and get active user mean:
         active_id = act_user.iloc[0]['user_id']
-        table = self.__build_item_user_table(act_user)
+        table, means = self.__build_item_user_table(act_user)
+        act_mean = means.loc[active_id]['mean']
 
         # Get a reduced version of table, only with the neighborhood users,
         # active user and only rated items:
         columns = neighborhood['user_id'].tolist()
+        means = means.loc[columns]['mean'].tolist()
         columns.append(active_id)
         df = table[columns]
         df = df[(df.T != 0).any()]
@@ -112,7 +120,7 @@ class CollaborativeFilter:
         weights = neighborhood['Correlation'].tolist()
         out = pd.DataFrame(columns=['item_id', 'expected_rating'])
         for index, row in df.iterrows():
-            rating = self.__predict(weights, row.tolist())
+            rating = self.__predict(weights, row.tolist(), means, act_mean)
             out = out.append({'item_id': index, 'expected_rating': rating}, ignore_index=True)
         
         # Prepare the returned df
