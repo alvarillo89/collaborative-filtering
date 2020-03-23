@@ -37,6 +37,16 @@ class CollaborativeFilter:
             columns="user_id", fill_value=0)
 
         return table, mean
+
+    
+    def __pearson(self, df, mean_act, mean):
+        """ Computes the Pearson correlation coeficient """
+        rv = np.array(df.iloc[:, 0]).astype(np.float64)
+        ru = np.array(df.iloc[:, 1]).astype(np.float64)
+        num = ((ru - mean_act) * (rv - mean)).sum()
+        dem_term1 = np.sqrt(((ru - mean_act)**2).sum())
+        dem_term2 = np.sqrt(((rv - mean)**2).sum())
+        return num / (dem_term1 * dem_term2)
         
 
     def build_neighborhood(self, act_user, k):
@@ -50,9 +60,10 @@ class CollaborativeFilter:
         
         # Init output dataframe:
         df = pd.DataFrame(columns=['user_id', 'Correlation'])        
-        # Get active user id:
+        # Get active user id, compute table and means:
         active_id = act_user.iloc[0]['user_id']
-        table, _ = self.__build_item_user_table(act_user)
+        table, means = self.__build_item_user_table(act_user)
+        act_mean = means.loc[active_id]['mean']
         
         # Compute correlations:
         for user in table:
@@ -61,10 +72,8 @@ class CollaborativeFilter:
                 tmp = table[[user, active_id]]
                 tmp = tmp[(tmp.T != 0).all()]
                 if tmp.shape[0] < 4: continue   # Avoid NaN errors
-                corr = pd.DataFrame(tmp.corrwith(tmp[active_id], method='pearson'), 
-                    columns=['Correlation'])
-                df = df.append({"user_id": corr.index[0], 
-                    "Correlation": corr.iloc[0]['Correlation']}, ignore_index=True)
+                corr = self.__pearson(tmp, act_mean, means.loc[user]['mean'])
+                df = df.append({"user_id": user, "Correlation": corr}, ignore_index=True)
 
         df = df.astype({"user_id": "int64"}, copy=False)
         df = df.sort_values(by='Correlation', ascending=False).head(k)
